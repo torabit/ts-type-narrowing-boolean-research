@@ -422,29 +422,29 @@ function canShowUsers(response) {
 
 #### ベンチマーク構成
 
-2つのファイルを用意し、それぞれ**1000個**の型とコンポーネントを定義しました。
+2つのファイルを用意し、それぞれ**1000個**の型とコンポーネントを定義しました。以下はその1個分のテンプレートです（実際には`UsersResponse0`〜`UsersResponse999`のように連番で生成）。
 
 **Type Predicateパターン:** 各コンポーネントにtype predicate関数を用意
 
 ```tsx
-type UsersResponseN = { users: User[] | undefined };
-type NonEmptyUsersResponseN = { users: NonNullable<UsersResponseN["users"]> };
+type UsersResponse = { users: User[] | undefined };
+type NonEmptyUsersResponse = { users: NonNullable<UsersResponse["users"]> };
 
-function hasUsersN(r: UsersResponseN): r is NonEmptyUsersResponseN {
+function hasUsers(r: UsersResponse): r is NonEmptyUsersResponse {
   return r.users != null && r.users.length > 0;
 }
 
-function ComponentN({ response }: { response: UsersResponseN }) {
-  return hasUsersN(response) ? <div>{response.users.length}</div> : null;
+function Component({ response }: { response: UsersResponse }) {
+  return hasUsers(response) ? <div>{response.users.length}</div> : null;
 }
 ```
 
 **インラインチェックパターン:** JSX内で直接条件チェック
 
 ```tsx
-type UsersResponseN = { users: User[] | undefined };
+type UsersResponse = { users: User[] | undefined };
 
-function ComponentN({ response }: { response: UsersResponseN }) {
+function Component({ response }: { response: UsersResponse }) {
   return response.users != null && response.users.length > 0 ? (
     <div>{response.users.length}</div>
   ) : null;
@@ -474,7 +474,7 @@ function ComponentN({ response }: { response: UsersResponseN }) {
 | Types   | 40,242         | 38,240             | +2,002  |
 | Memory  | 188,184K       | 183,642K           | +4,542K |
 
-Type Predicateを使うと、追加の型定義（`NonEmptyUsersResponseN`）と関数シグネチャの解決により、Symbolsが5,000個、Typesが約2,000個増加します。しかし、1個あたりに換算すると約0.19msの差であり、現実的な使用量（10〜50個）では2〜10msの差にしかならず、体感への影響はありません。
+Type Predicateを使うと、追加の型定義（`NonEmptyUsersResponse`）と関数シグネチャの解決により、Symbolsが5,000個、Typesが約2,000個増加します。しかし、1個あたりに換算すると約0.19msの差であり、現実的な使用量（10〜50個）では2〜10msの差にしかならず、体感への影響はありません。
 
 ## どのパターンを選ぶべきか
 
