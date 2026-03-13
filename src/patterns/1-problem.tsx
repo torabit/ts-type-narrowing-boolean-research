@@ -1,30 +1,28 @@
 // 問題の再現:
-// const showTable = table.list.length > 0 とすると boolean になり
-// JSX 内で table.list を使うとき型の絞り込みが効かない
+// const hasUsers = response.users != null && response.users.length > 0 とすると boolean になり
+// JSX 内で response.users を使うとき型の絞り込みが効かない
 
-type Props = {
-  table: { list: number[] | undefined };
-};
+import type { User, UsersResponse } from "../types";
 
-function Table({ data }: { data: number[] }) {
+function UserList({ users }: { users: User[] }) {
   return (
     <ul>
-      {data.map((n) => (
-        <li key={n}>{n}</li>
+      {users.map((user) => (
+        <li key={user.id}>{user.name} ({user.email})</li>
       ))}
     </ul>
   );
 }
 
-export function Problem({ table }: Props) {
+export function Problem({ response }: { response: UsersResponse }) {
   // boolean に代入した時点で narrowing が消える
-  const showTable = table.list != null && table.list.length > 0;
+  const hasUsers = response.users != null && response.users.length > 0;
 
   return (
     <div>
-      <p>showTable の型: boolean (narrowing 効かない)</p>
-      {/* table.list は number[] | undefined のまま */}
-      {showTable && <Table data={table.list} />}
+      <p>hasUsers の型: boolean (narrowing 効かない)</p>
+      {/* response.users は User[] | undefined のまま */}
+      {hasUsers && <UserList users={response.users} />}
     </div>
   );
 }

@@ -1,27 +1,25 @@
 // Pattern 4: non-null assertion (!)
-// 型安全ではないが、実用上は showTable が true なら list は non-null
+// 型安全ではないが、実用上は hasUsers が true なら users は non-null
 
-type Props = {
-  table: { list: number[] | undefined };
-};
+import type { User, UsersResponse } from "../types";
 
-function Table({ data }: { data: number[] }) {
+function UserList({ users }: { users: User[] }) {
   return (
     <ul>
-      {data.map((n) => (
-        <li key={n}>{n}</li>
+      {users.map((user) => (
+        <li key={user.id}>{user.name} ({user.email})</li>
       ))}
     </ul>
   );
 }
 
-export function Pattern4_NonNullAssertion({ table }: Props) {
-  const showTable = table.list != null && table.list.length > 0;
+export function Pattern4_NonNullAssertion({ response }: { response: UsersResponse }) {
+  const hasUsers = response.users != null && response.users.length > 0;
 
   return (
     <div>
       <p>! で型を上書き (型安全性は失われる)</p>
-      {showTable && <Table data={table.list!} />}
+      {hasUsers && <UserList users={response.users!} />}
     </div>
   );
 }

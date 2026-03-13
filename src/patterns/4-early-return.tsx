@@ -1,34 +1,32 @@
 // Pattern 3: early return
 // コンポーネントを分割して early return で narrowing
 
-type Props = {
-  table: { list: number[] | undefined };
-};
+import type { User, UsersResponse } from "../types";
 
-function Table({ data }: { data: number[] }) {
+function UserList({ users }: { users: User[] }) {
   return (
     <ul>
-      {data.map((n) => (
-        <li key={n}>{n}</li>
+      {users.map((user) => (
+        <li key={user.id}>{user.name} ({user.email})</li>
       ))}
     </ul>
   );
 }
 
-function TableSection({ list }: { list: number[] | undefined }) {
+function UserSection({ users }: { users: User[] | undefined }) {
   // early return で narrowing
-  if (list == null || list.length === 0) {
+  if (users == null || users.length === 0) {
     return null;
   }
-  // ここでは list: number[] に narrowing されている
-  return <Table data={list} />;
+  // ここでは users: User[] に narrowing されている
+  return <UserList users={users} />;
 }
 
-export function Pattern3_EarlyReturn({ table }: Props) {
+export function Pattern3_EarlyReturn({ response }: { response: UsersResponse }) {
   return (
     <div>
       <p>子コンポーネントで early return</p>
-      <TableSection list={table.list} />
+      <UserSection users={response.users} />
     </div>
   );
 }

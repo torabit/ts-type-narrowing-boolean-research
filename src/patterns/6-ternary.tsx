@@ -1,26 +1,24 @@
 // Pattern 5: ternary で直接 narrowing
 // 三項演算子の条件部分で直接チェックすれば narrowing が効く
 
-type Props = {
-  table: { list: number[] | undefined };
-};
+import type { User, UsersResponse } from "../types";
 
-function Table({ data }: { data: number[] }) {
+function UserList({ users }: { users: User[] }) {
   return (
     <ul>
-      {data.map((n) => (
-        <li key={n}>{n}</li>
+      {users.map((user) => (
+        <li key={user.id}>{user.name} ({user.email})</li>
       ))}
     </ul>
   );
 }
 
-export function Pattern5_Ternary({ table }: Props) {
+export function Pattern5_Ternary({ response }: { response: UsersResponse }) {
   return (
     <div>
       <p>三項演算子で直接条件チェック</p>
-      {table.list != null && table.list.length > 0 ? (
-        <Table data={table.list} />
+      {response.users != null && response.users.length > 0 ? (
+        <UserList users={response.users} />
       ) : (
         <p>No data</p>
       )}
