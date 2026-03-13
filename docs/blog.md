@@ -19,15 +19,11 @@ return (
     {response.permissions != null &&
       response.permissions.canViewUsers &&
       response.users != null &&
-      response.users.length > 0 && (
-        <UserTable users={response.users} />
-      )}
+      response.users.length > 0 && <UserTable users={response.users} />}
     {response.permissions != null &&
       response.permissions.canViewOrders &&
       response.orders != null &&
-      response.orders.length > 0 && (
-        <OrderTable orders={response.orders} />
-      )}
+      response.orders.length > 0 && <OrderTable orders={response.orders} />}
   </div>
 );
 
@@ -160,7 +156,7 @@ TypeScriptのDesign Goalsでは、Non-goalsとして「健全（sound）また�
 
 ```ts
 let hasUsers = response.users != null; // ① response.usersがnon-nullならtrue
-hasUsers = true;                        // ② 再代入。response.usersの状態とは無関係にtrueになった
+hasUsers = true; // ② 再代入。response.usersの状態とは無関係にtrueになった
 
 if (hasUsers) {
   // ③ hasUsersはtrueだが、response.usersがundefinedである可能性がある
@@ -176,7 +172,7 @@ if (hasUsers) {
 ```ts
 const hasUsers = response.users != null; // ① trueが入る
 
-response.users = undefined;              // ② オブジェクトのプロパティを書き換え
+response.users = undefined; // ② オブジェクトのプロパティを書き換え
 
 if (hasUsers) {
   // ③ hasUsersはconstなのでtrueのまま
@@ -225,7 +221,9 @@ const canShowUsers =
   response.users.length > 0;
 
 // AIが生成するコード — ! で型チェックを無効化
-{canShowUsers && <UserTable users={response.users!} />}
+{
+  canShowUsers && <UserTable users={response.users!} />;
+}
 ```
 
 `!`はTypeScriptに「この値はnullではない」と伝える演算子ですが、型チェックを無効化しているだけで、実行時の安全性は保証されません。ルールを守った結果かえって型安全性が悪化しているという本末転倒な状態です。
@@ -245,9 +243,7 @@ function Dashboard({ response }: { response: DashboardResponse }) {
       {response.permissions != null &&
         response.permissions.canViewUsers &&
         response.users != null &&
-        response.users.length > 0 && (
-          <UserTable users={response.users} />
-        )}
+        response.users.length > 0 && <UserTable users={response.users} />}
     </div>
   );
 }
@@ -260,10 +256,16 @@ function Dashboard({ response }: { response: DashboardResponse }) {
 TypeScriptの`is`構文を使い、関数の戻り値で型を絞り込む方法です。
 
 ```tsx
-type WithPermissions = { permissions: NonNullable<DashboardResponse["permissions"]> };
-type WithUsers = WithPermissions & { users: NonNullable<DashboardResponse["users"]> };
+type WithPermissions = {
+  permissions: NonNullable<DashboardResponse["permissions"]>;
+};
+type WithUsers = WithPermissions & {
+  users: NonNullable<DashboardResponse["users"]>;
+};
 
-function canShowUsers(response: DashboardResponse): response is DashboardResponse & WithUsers {
+function canShowUsers(
+  response: DashboardResponse,
+): response is DashboardResponse & WithUsers {
   return (
     response.permissions != null &&
     response.permissions.canViewUsers &&
@@ -274,9 +276,7 @@ function canShowUsers(response: DashboardResponse): response is DashboardRespons
 
 function Dashboard({ response }: { response: DashboardResponse }) {
   return (
-    <div>
-      {canShowUsers(response) && <UserTable users={response.users} />}
-    </div>
+    <div>{canShowUsers(response) && <UserTable users={response.users} />}</div>
   );
 }
 ```
@@ -289,7 +289,9 @@ function Dashboard({ response }: { response: DashboardResponse }) {
 
 ```tsx
 // コンパイルは通るが、実行時に壊れる
-function canShowUsers(response: DashboardResponse): response is DashboardResponse & WithUsers {
+function canShowUsers(
+  response: DashboardResponse,
+): response is DashboardResponse & WithUsers {
   return true; // 常にtrueを返す → usersがundefinedでもWithUsersとして扱われる
 }
 ```
@@ -344,7 +346,9 @@ const canShowUsers =
   response.users != null &&
   response.users.length > 0;
 
-{canShowUsers && <UserTable users={response.users!} />}
+{
+  canShowUsers && <UserTable users={response.users!} />;
+}
 ```
 
 型チェックを無効化しているため、将来的にコードが変更されたときにバグの温床になります。
@@ -394,7 +398,9 @@ Type Predicateが有力な選択肢であることはわかりました。しか
 
 ```ts
 // TypeScript
-function canShowUsers(response: DashboardResponse): response is DashboardResponse & WithUsers {
+function canShowUsers(
+  response: DashboardResponse,
+): response is DashboardResponse & WithUsers {
   return (
     response.permissions != null &&
     response.permissions.canViewUsers &&
@@ -488,7 +494,9 @@ Type Predicateを使うと、追加の型定義（`NonEmptyUsersResponse`）と�
 
 ```tsx
 // 一度定義すれば複数箇所で再利用できる
-function canShowUsers(response: DashboardResponse): response is DashboardResponse & WithUsers {
+function canShowUsers(
+  response: DashboardResponse,
+): response is DashboardResponse & WithUsers {
   return (
     response.permissions != null &&
     response.permissions.canViewUsers &&
@@ -531,7 +539,3 @@ function UserSection({
 この問題に対して5つのパターンを検証した結果、**Type Predicate**と**Early Return**が型安全性とルール準拠を両立できる現実的な選択肢でした。特にType Predicateは、パフォーマンス計測の結果からも型チェック速度への影響は無視できるレベルであり、安心して採用できます。
 
 コーディングルールを導入する際は、TypeScriptの型システムとの相互作用を考慮し、ルールの例外や推奨パターンをあわせて明記しておくと、チーム全体の開発体験が向上するのではないでしょうか。
-
-本記事で使用したコードは以下のリポジトリで公開しています。
-
-https://github.com/xxx/ts-type-narrowing-boolean-research
