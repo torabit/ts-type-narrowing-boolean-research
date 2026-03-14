@@ -182,7 +182,7 @@ if (hasUsers) {
 }
 ```
 
-`const hasUsers`が`true`であっても、それが評価された**時点**では正しかったが、`if (hasUsers)`に到達する**時点**では`response.users`の状態が変わっているかもしれません。コンパイラはこの可能性を排除できないため、`const`であってもboolean変数経由のnarrowingを行わない設計になっています。
+`const hasUsers`が`true`であっても、それが評価された時点では正しかったが、`if (hasUsers)`に到達する時点では`response.users`の状態が変わっているかもしれません。コンパイラはこの可能性を排除できないため、`const`であってもboolean変数経由のnarrowingを行わない設計になっています。
 
 #### コンパイラのパフォーマンス
 
