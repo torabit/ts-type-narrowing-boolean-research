@@ -148,11 +148,7 @@ if (hasOrders) {
 
 #### エイリアス条件と可変性の問題
 
-もし`const`ではなく`let`で宣言されていた場合、boolean変数は後から再代入される可能性があります。再代入されると元の条件との関係が壊れるため、コンパイラがnarrowingを維持すると型の健全性が損なわれます。
-
-TypeScriptのDesign Goalsでは、Non-goalsとして「健全（sound）または"証明可能な正しさ"を持つ型システムを適用すること」が[明記](https://github.com/microsoft/TypeScript/wiki/TypeScript-Design-Goals#non-goals)されています。つまり、TypeScriptは完全な健全性よりも正確さと生産性のバランスを重視する設計です。しかしそれでも、明らかに不健全になるケースは避ける方針をとっており、boolean変数経由のnarrowingはまさにそのケースに該当します。
-
-具体例を見てみます。
+先ほどの例では`const`で宣言していましたが、TypeScriptのコンパイラは`const`か`let`かに関係なく、boolean変数経由のnarrowingを行いません。まず`let`のケースで考えてみます。`let`で宣言されたboolean変数は後から再代入できるため、仮にnarrowingを行うと次のような問題が起きます。
 
 ```ts
 let hasUsers = response.users != null; // (1) response.usersがnon-nullならtrue
@@ -165,9 +161,9 @@ if (hasUsers) {
 }
 ```
 
-(1)の時点では`hasUsers`は`response.users`の状態を正しく反映しています。しかし(2)で`true`を直接代入すると、`hasUsers`の値と`response.users`の状態は無関係になります。もし(3)でコンパイラが「`hasUsers`が`true`だから`response.users`は`User[]`」とnarrowingしてしまうと、`response.users`が`undefined`のケースで実行時エラーが発生します。
+(1)の時点では`hasUsers`は`response.users`の状態を正しく反映していますが、(2)で`true`を直接代入すると両者の関係は壊れます。もし(3)でコンパイラが「`hasUsers`が`true`だから`response.users`は`User[]`」とnarrowingしてしまうと、`response.users`が`undefined`のケースで実行時エラーが発生します。TypeScriptのDesign Goalsでは、Non-goalsとして「健全（sound）または"証明可能な正しさ"を持つ型システムを適用すること」が[明記](https://github.com/microsoft/TypeScript/wiki/TypeScript-Design-Goals#non-goals)されており、完全な健全性よりも正確さと生産性のバランスを重視する設計です。しかしそれでも、このように明らかに不健全になるケースは避ける方針をとっています。
 
-「`const`なら再代入されないから追跡できるのでは？」と思うかもしれません。しかし、`const`が再代入を防ぐのは`hasUsers`変数自体だけです。元のオブジェクト`response`のプロパティは`const`の影響を受けません。
+では「`const`なら再代入されないから追跡できるのでは？」と思うかもしれません。しかし`const`が再代入を防ぐのは`hasUsers`変数自体だけであり、元のオブジェクト`response`のプロパティは`const`の影響を受けません。
 
 ```ts
 const hasUsers = response.users != null; // (1) trueが入る
@@ -182,7 +178,7 @@ if (hasUsers) {
 }
 ```
 
-`const hasUsers`が`true`であっても、それが評価された時点では正しかったが、`if (hasUsers)`に到達する時点では`response.users`の状態が変わっているかもしれません。コンパイラはこの可能性を排除できないため、`const`であってもboolean変数経由のnarrowingを行わない設計になっています。
+`const hasUsers`が`true`であっても、それは評価時点の事実にすぎません。`if (hasUsers)`に到達するまでに`response.users`が書き換えられている可能性をコンパイラは排除できないため、`const`であってもboolean変数経由のnarrowingは行わない設計になっています。
 
 #### コンパイラのパフォーマンス
 
@@ -190,9 +186,32 @@ if (hasUsers) {
 
 TypeScriptコンパイラの[binder](https://github.com/microsoft/TypeScript/blob/main/src/compiler/binder.ts)はコンパイルパイプラインの初期段階で、AST上の各宣言にシンボルを割り当て、シンボルテーブルを構築するコンポーネントです。このbinderが制御フロー解析の状態も管理しているため、ここにboolean変数の逆引き追跡のようなロジックを追加すると、コンパイル全体のパフォーマンスに影響します。
 
-#### 例外: discriminant propertyのエイリアス
+#### 例外: narrowingが効くエイリアスのケース
 
-なお、TypeScriptがboolean変数のエイリアスを**まったく**追跡しないわけではありません。discriminant property（判別プロパティ）を直接エイリアスした場合には、narrowingが効くケースがあります。
+ここまでの説明では「boolean変数経由のnarrowingは効かない」としてきましたが、例外的にnarrowingが効くケースもあります。
+
+**`readonly`プロパティ由来のboolean変数**
+
+プロパティが`readonly`で宣言されている場合、コンパイラはそのプロパティが書き換えられないことを保証できます。前述の`const`の問題は「プロパティが変更されうること」が原因でしたが、`readonly`であればその可能性が排除されるため、boolean変数経由でもnarrowingが効きます。
+
+```ts
+type Response = {
+  readonly users: User[] | undefined;
+};
+
+function example(response: Response) {
+  const hasUsers = response.users != null;
+  if (hasUsers) {
+    response.users; // User[] にnarrowingされる
+  }
+}
+```
+
+ただし、`response`オブジェクト自体が再代入される場合はnarrowingが消えます。プロパティが`readonly`でも、オブジェクトごと置き換わればプロパティの値も変わるためです。
+
+**discriminant propertyの直接エイリアス**
+
+discriminant property（判別プロパティ）の**値そのもの**を変数にエイリアスした場合も、narrowingが効きます。
 
 ```ts
 type Shape =
@@ -200,14 +219,27 @@ type Shape =
   | { kind: "square"; side: number };
 
 function area(shape: Shape) {
-  const kind = shape.kind; // discriminant propertyの直接エイリアス
+  const kind = shape.kind; // discriminant propertyの値をそのままエイリアス
   if (kind === "circle") {
     shape.radius; // Shape → { kind: "circle"; radius: number } にnarrowing
   }
 }
 ```
 
-これはboolean変数とは異なり、discriminant propertyの値が元の型と一対一で対応しているため、コンパイラが安全に追跡できるためです。一方、`response.users != null`のような任意の条件式をbooleanに格納するケースでは、このような直接的な対応関係がないため追跡の対象外になっています。
+これは`kind`が`shape.kind`の値そのものを保持しており、値と型が一対一で対応しているためです。一方、同じdiscriminant propertyでも**boolean条件に変換**するとnarrowingは効きません。
+
+```ts
+function area(shape: Shape) {
+  const isCircle = shape.kind === "circle"; // booleanに変換
+  if (isCircle) {
+    shape.radius; // エラー！narrowingされない
+  }
+}
+```
+
+`isCircle`は比較結果の`boolean`であり、`shape.kind`の値ではありません。コンパイラは`boolean`の`true`から元の条件式を逆引きしないため、`shape`がミュータブルである以上narrowingの対象外になります。
+
+このように、narrowingが効くかどうかの本質は**エイリアス先の変数が元の値との対応関係を維持できるか**にあります。`readonly`プロパティやdiscriminant propertyの直接エイリアスは対応関係が保たれますが、boolean変数への変換はその関係を断ち切ってしまいます。
 
 ### AIが生成する"解決策"の問題
 
