@@ -1,10 +1,10 @@
-# boolean変数に代入すると型の絞り込みが消える ── TypeScriptのnarrowingとコーディングルールの両立
+# boolean変数に代入すると型の絞り込みが消える ── Claude CodeのルールとTypeScript narrowingの両立
 
 ## はじめに
 
 こんにちは。Wantedly の採用管理サービス「Wantedly Hire」の開発をしている Toranosuke Ujike([@tora_tora_bit](https://x.com/tora_tora_bit)) です。
 
-昨今、AIにコーディングを任せる場面が増えてきました。Cursorの[Rules](https://cursor.com/docs/context/rules)やClaude Codeの[CLAUDE.md](https://code.claude.com/docs/en/memory)など、主要なAIコーディングツールには「ルールファイル」を設定する仕組みが用意されています。これらはLLMがコンテキスト間で記憶を保持しないという制約に対して、プロンプトレベルで永続的なコンテキストを提供するものです。コーディング規約や命名規則をルールとして定義しておくことで、AIが生成するコードの品質を一貫させ、チーム全体の標準に沿ったアウトプットを得ることができます。
+昨今、AIにコーディングを任せる場面が増えてきました。Cursorの[Rules](https://cursor.com/docs/context/rules)やClaude Codeの[`.claude/rules/`](https://docs.anthropic.com/en/docs/claude-code/settings#settings-files-and-location)など、主要なAIコーディングツールには「ルールファイル」を設定する仕組みが用意されています。これらはLLMがコンテキスト間で記憶を保持しないという制約に対して、プロンプトレベルで永続的なコンテキストを提供するものです。コーディング規約や命名規則をルールとして定義しておくことで、AIが生成するコードの品質を一貫させ、チーム全体の標準に沿ったアウトプットを得ることができます。
 
 私たちのチームでも、AIのアウトプットの質を上げるためにルールの整備を進めていました。そのなかで、以下のようなルールが導入されました。
 
