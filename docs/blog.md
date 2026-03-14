@@ -241,9 +241,9 @@ function area(shape: Shape) {
 
 このように、narrowingが効くかどうかの本質は**エイリアス先の変数が元の値との対応関係を維持できるか**にあります。`readonly`プロパティやdiscriminant propertyの直接エイリアスは対応関係が保たれますが、boolean変数への変換はその関係を断ち切ってしまいます。
 
-### AIが生成する"解決策"の問題
+### AIがとる解決策の問題
 
-この型エラーに対して、AIコーディングアシスタントはしばしば`!`（non-null assertion）で対処します。
+この型エラーに対して、AIコーディングアシスタントはしばしば`!`（non-null assertion）で対処します。まずコーディングルールに従って条件をboolean変数に切り出しますが、型エラーが発生します。そこでインラインチェックに戻そうとしますが、ルール準拠と型安全性の両立ができず、最終的に`!`（non-null assertion）で型エラーを黙らせるコードを生成しがちです。
 
 ```tsx
 const canShowUsers =
@@ -252,7 +252,7 @@ const canShowUsers =
   response.users != null &&
   response.users.length > 0;
 
-// AIが生成するコード — ! で型チェックを無効化
+// ! で型チェックを無効化
 {
   canShowUsers && <UserTable users={response.users!} />;
 }
