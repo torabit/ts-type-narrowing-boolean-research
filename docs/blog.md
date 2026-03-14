@@ -155,29 +155,29 @@ TypeScriptのDesign Goalsでは、Non-goalsとして「健全（sound）また�
 具体例を見てみます。
 
 ```ts
-let hasUsers = response.users != null; // ① response.usersがnon-nullならtrue
-hasUsers = true; // ② 再代入。response.usersの状態とは無関係にtrueになった
+let hasUsers = response.users != null; // (1) response.usersがnon-nullならtrue
+hasUsers = true; // (2) 再代入。response.usersの状態とは無関係にtrueになった
 
 if (hasUsers) {
-  // ③ hasUsersはtrueだが、response.usersがundefinedである可能性がある
-  //    もしここでnarrowingしてUser[]として扱うと、実行時にクラッシュする
+  // (3) hasUsersはtrueだが、response.usersがundefinedである可能性がある
+  //     もしここでnarrowingしてUser[]として扱うと、実行時にクラッシュする
   response.users;
 }
 ```
 
-①の時点では`hasUsers`は`response.users`の状態を正しく反映しています。しかし②で`true`を直接代入すると、`hasUsers`の値と`response.users`の状態は無関係になります。もし③でコンパイラが「`hasUsers`が`true`だから`response.users`は`User[]`」とnarrowingしてしまうと、`response.users`が`undefined`のケースで実行時エラーが発生します。
+(1)の時点では`hasUsers`は`response.users`の状態を正しく反映しています。しかし(2)で`true`を直接代入すると、`hasUsers`の値と`response.users`の状態は無関係になります。もし(3)でコンパイラが「`hasUsers`が`true`だから`response.users`は`User[]`」とnarrowingしてしまうと、`response.users`が`undefined`のケースで実行時エラーが発生します。
 
 「`const`なら再代入されないから追跡できるのでは？」と思うかもしれません。しかし、`const`が再代入を防ぐのは`hasUsers`変数自体だけです。元のオブジェクト`response`のプロパティは`const`の影響を受けません。
 
 ```ts
-const hasUsers = response.users != null; // ① trueが入る
+const hasUsers = response.users != null; // (1) trueが入る
 
-response.users = undefined; // ② オブジェクトのプロパティを書き換え
+response.users = undefined; // (2) オブジェクトのプロパティを書き換え
 
 if (hasUsers) {
-  // ③ hasUsersはconstなのでtrueのまま
-  //    しかしresponse.usersはもうundefined
-  //    narrowingしたらUser[]扱いになり、実行時にクラッシュする
+  // (3) hasUsersはconstなのでtrueのまま
+  //     しかしresponse.usersはもうundefined
+  //     narrowingしたらUser[]扱いになり、実行時にクラッシュする
   response.users;
 }
 ```
