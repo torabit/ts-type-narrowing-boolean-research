@@ -335,7 +335,7 @@ function Dashboard({ response }: { response: DashboardResponse }) {
 }
 ```
 
-`if`文でガードした後のコードブロックでは、TypeScriptが自然にnarrowingを効かせてくれます。最もTypeScriptらしいアプローチですが、コンポーネントの分割が必要になります。
+`if`文でガードした後のコードブロックでは、TypeScriptが自然にnarrowingを効かせてくれます。TypeScriptのControl Flow Analysisと自然に噛み合うだけでなく、Reactにおいてもコンポーネントから`null`を返して不要なレンダリングをスキップするのは推奨パターンです。ただし、コンポーネントの分割が必要になります。
 
 ### Pattern 4: Non-null Assertion（!）
 
@@ -515,7 +515,7 @@ function canShowUsers(
 - TypeScriptの標準的なnarrowingだけで完結させたい場合
 
 ```tsx
-// 最もTypeScriptらしい自然なアプローチ
+// TypeScriptのControl Flow AnalysisとReactのコンポーネント分割の両方と自然に噛み合う
 function UserSection({
   users,
   permissions,
