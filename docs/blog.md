@@ -430,7 +430,7 @@ function canShowUsers(response) {
 
 #### ベンチマーク構成
 
-2つのファイルを用意し、それぞれ**1000個**の型とコンポーネントを定義しました。以下はその1個分のテンプレートです（実際には`UsersResponse0`〜`UsersResponse999`のように連番で生成）。
+2つのファイルを用意し、それぞれ**1,000個**の型とコンポーネントを定義しました。以下はその1個分のテンプレートです（実際には`UsersResponse0`〜`UsersResponse999`のように連番で生成）。
 
 **Type Predicateパターン:** 各コンポーネントにtype predicate関数を用意
 
@@ -472,7 +472,7 @@ function Component({ response }: { response: UsersResponse }) {
 | 5        | 1.44s          | 1.23s              |
 | **平均** | **1.45s**      | **1.26s**          |
 
-**1000個あたりの差は約0.19秒**でした。
+**1,000個あたりの差は約0.19秒**でした。
 
 #### コンパイラ内部の統計
 
