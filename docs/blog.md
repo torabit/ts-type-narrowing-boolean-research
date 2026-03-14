@@ -296,11 +296,13 @@ function canShowUsers(
 }
 ```
 
-TypeScriptは「`true`が返されたとき`response`は`DashboardResponse & WithUsers`である」と信じるだけで、関数内部のロジックが実際にその型を保証しているかは検査しません。つまり、Type Predicateは`as`や`!`と同様に**開発者がTypeScriptに"嘘"をつけてしまう仕組み**です。
+TypeScriptは「`true`が返されたとき`response`は`DashboardResponse & WithUsers`である」と信じるだけで、関数内部のロジックが実際にその型を保証しているかは検査しません。
+
+TypeScriptには、型の正しさをコンパイラではなく開発者が保証する機能がいくつかあります。`as`によるtype assertionや`!`によるnon-null assertionがその代表です。これらは型システムの制約を開発者の判断で迂回する手段であり、本記事では**Escape Hatch**と呼ぶことにします。Type PredicateもこのEscape Hatchの一種です。
 
 条件ロジックを変更した際に戻り値の型を更新し忘れたり、リファクタリングでチェック内容がずれたりすると、型上は安全に見えるのに実行時にクラッシュするという、非常に発見しにくいバグにつながります。
 
-この点において、Early Returnパターンは`if`文によるnarrowingをTypeScriptが自動で検証するため、こうした"嘘"が入り込む余地がありません。
+この点において、Early Returnパターンは`if`文によるnarrowingをTypeScriptが自動で検証するため、Escape Hatchに頼る必要がありません。
 
 ### Pattern 3: Early Return
 
