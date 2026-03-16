@@ -144,22 +144,20 @@ if (hasOrders) {
 }
 ```
 
-なお、TypeScript 4.4で「[Control Flow Analysis of Aliased Conditions and Discriminants](https://github.com/microsoft/TypeScript/pull/44730)」（Anders Hejlsberg, PR #44730）が導入され、`const`宣言されたエイリアス条件経由でもnarrowingが効くケースが追加されました。たとえば`typeof`によるプリミティブ型のチェックは、エイリアス経由でも正しくnarrowingされます。
+なお、TypeScript 4.4以前はboolean変数経由のnarrowingは一切サポートされていませんでした。4.4で「[Control Flow Analysis of Aliased Conditions and Discriminants](https://github.com/microsoft/TypeScript/pull/44730)」（Anders Hejlsberg, PR #44730）が導入され、一定の条件下でエイリアス経由のnarrowingが効くようになりました。しかし今回の`response.users != null`のようなケースには依然として効きません。以降ではその理由を掘り下げます。
 
-```ts
-function example(x: string | number) {
-  const isString = typeof x === "string";
-  if (isString) {
-    x; // string にnarrowingされる（TypeScript 4.4以降）
-  }
-}
-```
+#### エイリアス経由のnarrowingと不変性の原則
 
-しかし今回の問題はこれとは異なります。`response.users != null`のようなオブジェクトプロパティのチェックでは、プロパティがミュータブルであるため、4.4以降でもエイリアス経由のnarrowingは効きません。以降では、なぜこのケースではnarrowingが効かないのか、コンパイラ設計上の理由を掘り下げます。
+TypeScriptのControl Flow Analysisがエイリアス経由でnarrowingを行うには、**条件の評価時点から使用時点までの間に、関連するすべての値が変化しないこと**をコンパイラが保証できる必要があります。言い換えると、**不変であると確約された値だけが追跡対象になる**という原則です。
 
-#### エイリアス条件と可変性の問題
+この原則に照らすと、エイリアス経由のnarrowingには2つの不変性が同時に求められます。
 
-先ほどの例では`const`で宣言していましたが、TypeScriptのコンパイラは`const`か`let`かに関係なく、boolean変数経由のnarrowingを行いません。まず`let`のケースで考えてみます。`let`で宣言されたboolean変数は後から再代入できるため、仮にnarrowingを行うと次のような問題が起きます。
+1. **エイリアス変数自体の不変性** ── boolean変数が`const`で宣言され、再代入されないこと
+2. **チェック対象の値の不変性** ── 条件式が参照する変数やプロパティが、チェック後に変更されないこと
+
+どちらか一方でも満たされなければ、コンパイラはnarrowingを行いません。具体的に見てみます。
+
+**エイリアス変数が可変（`let`）な場合**
 
 ```ts
 let hasUsers = response.users != null; // (1) response.usersがnon-nullならtrue
@@ -167,45 +165,57 @@ hasUsers = true; // (2) 再代入。response.usersの状態とは無関係にtru
 
 if (hasUsers) {
   // (3) hasUsersはtrueだが、response.usersがundefinedである可能性がある
-  //     もしここでnarrowingしてUser[]として扱うと、実行時にクラッシュする
-  response.users;
+  response.users; // narrowingされない
 }
 ```
 
-(1)の時点では`hasUsers`は`response.users`の状態を正しく反映していますが、(2)で`true`を直接代入すると両者の関係は壊れます。もし(3)でコンパイラが「`hasUsers`が`true`だから`response.users`は`User[]`」とnarrowingしてしまうと、`response.users`が`undefined`のケースで実行時エラーが発生します。TypeScriptのDesign Goalsでは、Non-goalsとして「健全（sound）または"証明可能な正しさ"を持つ型システムを適用すること」が[明記](https://github.com/microsoft/TypeScript/wiki/TypeScript-Design-Goals#non-goals)されており、完全な健全性よりも正確さと生産性のバランスを重視する設計です。しかしそれでも、このように明らかに不健全になるケースは避ける方針をとっています。
+エイリアス変数自体が書き換わりうるため、条件1を満たしません。
 
-では「`const`なら再代入されないから追跡できるのでは？」と思うかもしれません。しかし`const`が再代入を防ぐのは`hasUsers`変数自体だけであり、元のオブジェクト`response`のプロパティは`const`の影響を受けません。
+**チェック対象がミュータブルなプロパティの場合**
 
 ```ts
 const hasUsers = response.users != null; // (1) trueが入る
 
-response.users = undefined; // (2) オブジェクトのプロパティを書き換え
+response.users = undefined; // (2) プロパティが書き換えられる
 
 if (hasUsers) {
-  // (3) hasUsersはconstなのでtrueのまま
-  //     しかしresponse.usersはもうundefined
-  //     narrowingしたらUser[]扱いになり、実行時にクラッシュする
-  response.users;
+  // (3) hasUsersはconstなのでtrueのまま、しかしresponse.usersはもうundefined
+  response.users; // narrowingされない
 }
 ```
 
-`const hasUsers`が`true`であっても、それは評価時点の事実にすぎません。`if (hasUsers)`に到達するまでに`response.users`が書き換えられている可能性をコンパイラは排除できないため、`const`であってもboolean変数経由のnarrowingは行わない設計になっています。
+エイリアス変数は`const`で不変（条件1は満たす）ですが、チェック対象の`response.users`がミュータブルなため条件2を満たしません。**今回の問題はまさにこのケース**です。`const`で宣言してもプロパティの不変性は保証されないため、narrowingは効きません。
 
-#### コンパイラのパフォーマンス
+TypeScriptのDesign Goalsでは、Non-goalsとして「健全（sound）または"証明可能な正しさ"を持つ型システムを適用すること」が[明記](https://github.com/microsoft/TypeScript/wiki/TypeScript-Design-Goals#non-goals)されており、完全な健全性よりも正確さと生産性のバランスを重視する設計です。しかしそれでも、上記のように明らかに不健全になるケースは避ける方針をとっています。
 
-任意のboolean変数から元の条件式を逆引きし、すべての制御フローパスでその条件式を再評価する処理は、コンパイル速度に大きな影響を与えます。
+#### 不変性が満たされるケース
 
-TypeScriptコンパイラには[binder](https://github.com/microsoft/TypeScript/blob/main/src/compiler/binder.ts)と呼ばれる仕組みがあります。これはコンパイルパイプラインの初期段階で動作するコンポーネントで、抽象構文木（AST）上の各宣言に`Symbol`オブジェクトを割り当て、シンボルテーブルを構築します。いわばコード全体の初期インデックスを作成する役割です。binderは同時に制御フローグラフも構築しており、`FlowCondition`や`FlowMutation`といったノードを連結して、プログラムの実行パスをモデル化しています。
+逆に、両方の条件を満たせばエイリアス経由でもnarrowingが効きます。
 
-もし、任意のboolean変数からその変数の元々の条件式を逆引きし、すべての制御フローパスでその条件式を再評価するような仕組みを追加するとどうなるでしょうか。コンパイラはコードを上から下へ素直に読むのではなく、条件式に出合うたびにフローグラフの`antecedent`（先行ノード）リンクを遡り、変数同士の依存関係を再帰的に解決しなければならなくなります。ネストされた`if`文やループ、`switch`文が絡むと制御フローパスの数は指数関数的に増加するため、逆引き追跡のコストは現実的ではありません。
+**ローカル変数 + `const`エイリアス**
 
-#### 例外: narrowingが効くエイリアスのケース
+```ts
+function example(x: string | number) {
+  const isString = typeof x === "string";
+  if (isString) {
+    x; // string にnarrowingされる
+  }
+}
+```
 
-ここまでの説明では「boolean変数経由のnarrowingは効かない」としてきましたが、例外的にnarrowingが効くケースもあります。
+`isString`は`const`（条件1）、`x`はローカル変数で`isString`の評価後に再代入されていない（条件2）。コンパイラは制御フローグラフ上で`x`への再代入（`FlowMutation`）がないことを確認できるため、narrowingが成立します。ただし、`isString`の評価後に`x`に再代入すると、narrowingは消えます。
 
-**`readonly`プロパティ由来のboolean変数**
+```ts
+function example(x: string | number) {
+  const isString = typeof x === "string";
+  x = 42; // 再代入
+  if (isString) {
+    x; // number（narrowingされない）
+  }
+}
+```
 
-プロパティが`readonly`で宣言されている場合、コンパイラはそのプロパティが書き換えられないことを保証できます。前述の`const`の問題は「プロパティが変更されうること」が原因でしたが、`readonly`であればその可能性が排除されるため、boolean変数経由でもnarrowingが効きます。
+**`readonly`プロパティ + `const`エイリアス**
 
 ```ts
 type Response = {
@@ -220,11 +230,9 @@ function example(response: Response) {
 }
 ```
 
-ただし、`response`オブジェクト自体が再代入される場合はnarrowingが消えます。プロパティが`readonly`でも、オブジェクトごと置き換わればプロパティの値も変わるためです。
+`hasUsers`は`const`（条件1）、`response.users`は`readonly`で書き換え不可（条件2）。ただし、`response`オブジェクト自体が再代入される場合はnarrowingが消えます。プロパティが`readonly`でも、オブジェクトごと置き換わればプロパティの値も変わるためです。
 
 **discriminant propertyの直接エイリアス**
-
-discriminant property（判別プロパティ）の**値そのもの**を変数にエイリアスした場合も、narrowingが効きます。
 
 ```ts
 type Shape =
@@ -239,7 +247,7 @@ function area(shape: Shape) {
 }
 ```
 
-これは`kind`が`shape.kind`の値そのものを保持しており、値と型が一対一で対応しているためです。一方、同じdiscriminant propertyでも**boolean条件に変換**するとnarrowingは効きません。
+`kind`は`const`で`shape.kind`の値そのものを保持しており（条件1）、値と型が一対一で対応しているため、元のプロパティが変更されても`kind`自体の不変性だけでnarrowingが成立します（条件2）。一方、同じdiscriminant propertyでも**boolean条件に変換**するとnarrowingは効きません。
 
 ```ts
 function area(shape: Shape) {
@@ -250,9 +258,15 @@ function area(shape: Shape) {
 }
 ```
 
-`isCircle`は比較結果の`boolean`であり、`shape.kind`の値ではありません。コンパイラは`boolean`の`true`から元の条件式を逆引きしないため、`shape`がミュータブルである以上narrowingの対象外になります。
+`isCircle`は`const`（条件1を満たす）ですが、`boolean`の`true`から元の条件式を逆引きする必要があり、`shape`がミュータブルであるため条件2を満たしません。
 
-このように、narrowingが効くかどうかの本質は**エイリアス先の変数が元の値との対応関係を維持できるか**にあります。`readonly`プロパティやdiscriminant propertyの直接エイリアスは対応関係が保たれますが、boolean変数への変換はその関係を断ち切ってしまいます。
+#### コンパイラのパフォーマンス
+
+では、コンパイラがもっと頑張ってミュータブルなプロパティの変更も追跡すればよいのでは？と思うかもしれません。しかし、これはコンパイル速度に大きな影響を与えます。
+
+TypeScriptコンパイラには[binder](https://github.com/microsoft/TypeScript/blob/main/src/compiler/binder.ts)と呼ばれる仕組みがあります。これはコンパイルパイプラインの初期段階で動作するコンポーネントで、抽象構文木（AST）上の各宣言に`Symbol`オブジェクトを割り当て、シンボルテーブルを構築します。いわばコード全体の初期インデックスを作成する役割です。binderは同時に制御フローグラフも構築しており、`FlowCondition`や`FlowMutation`といったノードを連結して、プログラムの実行パスをモデル化しています。
+
+もし、任意のboolean変数からその変数の元々の条件式を逆引きし、すべての制御フローパスでその条件式を再評価するような仕組みを追加するとどうなるでしょうか。コンパイラはコードを上から下へ素直に読むのではなく、条件式に出合うたびにフローグラフの`antecedent`（先行ノード）リンクを遡り、変数同士の依存関係を再帰的に解決しなければならなくなります。ネストされた`if`文やループ、`switch`文が絡むと制御フローパスの数は指数関数的に増加するため、逆引き追跡のコストは現実的ではありません。
 
 ## AIがとる解決策
 
