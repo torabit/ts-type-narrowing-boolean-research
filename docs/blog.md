@@ -146,14 +146,12 @@ if (hasOrders) {
 
 なお、TypeScript 4.4以前はboolean変数経由のnarrowingは一切サポートされていませんでした。4.4で「[Control Flow Analysis of Aliased Conditions and Discriminants](https://github.com/microsoft/TypeScript/pull/44730)」（Anders Hejlsberg, PR #44730）が導入され、一定の条件下でエイリアス経由のnarrowingが効くようになりました。しかし今回の`response.users != null`のようなケースには依然として効きません。以降ではその理由を掘り下げます。
 
-#### エイリアス経由のnarrowingと不変性の原則
+#### エイリアスnarrowingの条件
 
-TypeScriptのControl Flow Analysisがエイリアス経由でnarrowingを行うには、**条件の評価時点から使用時点までの間に、関連するすべての値が変化しないこと**をコンパイラが保証できる必要があります。言い換えると、**不変であると確約された値だけが追跡対象になる**という原則です。
+TypeScriptのControl Flow Analysisがエイリアス経由でnarrowingを行うには、**条件の評価時点から使用時点までの間に、関連するすべての値が変わらないこと**をコンパイラが保証できる必要があります。具体的には、次の2つの条件が同時に求められます。
 
-この原則に照らすと、エイリアス経由のnarrowingには2つの不変性が同時に求められます。
-
-1. **エイリアス変数自体の不変性** ── boolean変数が`const`で宣言され、再代入されないこと
-2. **チェック対象の値の不変性** ── 条件式が参照する変数やプロパティが、チェック後に変更されないこと
+1. **エイリアス変数自体の不変性** ── boolean変数が`const`で宣言され、再代入されない
+2. **チェック対象の値の不変性** ── 条件式が参照する変数やプロパティが、チェック後に変更されない
 
 どちらか一方でも満たされなければ、コンパイラはnarrowingを行いません。具体的に見てみます。
 
