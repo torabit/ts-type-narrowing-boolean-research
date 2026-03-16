@@ -184,7 +184,9 @@ if (hasUsers) {
 
 任意のboolean変数から元の条件式を逆引きし、すべての制御フローパスでその条件式を再評価する処理は、コンパイル速度に大きな影響を与えます。
 
-TypeScriptコンパイラの[binder](https://github.com/microsoft/TypeScript/blob/main/src/compiler/binder.ts)はコンパイルパイプラインの初期段階で、AST上の各宣言にシンボルを割り当て、シンボルテーブルを構築するコンポーネントです。このbinderが制御フロー解析の状態も管理しているため、ここにboolean変数の逆引き追跡のようなロジックを追加すると、コンパイル全体のパフォーマンスに影響します。
+TypeScriptコンパイラには[binder](https://github.com/microsoft/TypeScript/blob/main/src/compiler/binder.ts)と呼ばれる仕組みがあります。これはコンパイルパイプラインの初期段階で動作するコンポーネントで、抽象構文木（AST）上の各宣言に`Symbol`オブジェクトを割り当て、シンボルテーブルを構築します。いわばコード全体の初期インデックスを作成する役割です。binderは同時に制御フローグラフも構築しており、`FlowCondition`や`FlowMutation`といったノードを連結して、プログラムの実行パスをモデル化しています。
+
+もし、任意のboolean変数からその変数の元々の条件式を逆引きし、すべての制御フローパスでその条件式を再評価するような仕組みを追加するとどうなるでしょうか。コンパイラはコードを上から下へ素直に読むのではなく、条件式に出合うたびにフローグラフの`antecedent`（先行ノード）リンクを遡り、変数同士の依存関係を再帰的に解決しなければならなくなります。ネストされた`if`文やループ、`switch`文が絡むと制御フローパスの数は指数関数的に増加するため、逆引き追跡のコストは現実的ではありません。
 
 #### 例外: narrowingが効くエイリアスのケース
 
@@ -410,17 +412,100 @@ function Dashboard({ response }: { response: DashboardResponse }) {
 
 Pattern 1と同様にnarrowingが効きますが、JSX内に条件を書いているためルール違反です。データがない場合のフォールバック表示を書きやすいのが利点です。
 
+### Pattern 6: Discriminated Union（判別可能ユニオン）
+
+ここまでの比較で、型安全性とルール準拠を両立できるのはType PredicateとEarly Returnでした。しかしType Predicateは本質的にEscape Hatchであり、実装の正しさをコンパイラが保証しない点が残ります。Non-null Assertionがダメなのであれば、ユーザー定義型ガードも「開発者が正しさを保証する」という点では同じ構造であり、根本的な解決とは言えません。
+
+そこで、Escape Hatchに頼らずコンパイラの自動検証だけで型安全性を確保できるアプローチとして、Discriminated Union（判別可能ユニオン）を検討します。各状態を共通のタグプロパティで区別し、`switch`文でハンドリングする方法です。
+
+```tsx
+// APIレスポンスをタグ付きユニオンに変換する
+type DashboardSection =
+  | { tag: "users"; users: User[]; permissions: Permissions }
+  | { tag: "orders"; orders: Order[]; permissions: Permissions }
+  | { tag: "empty"; reason: string };
+
+function toDashboardSections(
+  response: DashboardResponse,
+): DashboardSection[] {
+  const sections: DashboardSection[] = [];
+  if (
+    response.permissions != null &&
+    response.permissions.canViewUsers &&
+    response.users != null &&
+    response.users.length > 0
+  ) {
+    sections.push({
+      tag: "users",
+      users: response.users,
+      permissions: response.permissions,
+    });
+  }
+  if (
+    response.permissions != null &&
+    response.permissions.canViewOrders &&
+    response.orders != null &&
+    response.orders.length > 0
+  ) {
+    sections.push({
+      tag: "orders",
+      orders: response.orders,
+      permissions: response.permissions,
+    });
+  }
+  if (sections.length === 0) {
+    sections.push({ tag: "empty", reason: "表示できるデータがありません" });
+  }
+  return sections;
+}
+
+function DashboardSection({ section }: { section: DashboardSection }) {
+  switch (section.tag) {
+    case "users":
+      // section.users は User[] にnarrowingされる（コンパイラが自動検証）
+      return <UserTable users={section.users} />;
+    case "orders":
+      // section.orders は Order[] にnarrowingされる
+      return <OrderTable orders={section.orders} />;
+    case "empty":
+      return <p>{section.reason}</p>;
+  }
+}
+
+function Dashboard({ response }: { response: DashboardResponse }) {
+  const sections = toDashboardSections(response);
+  return (
+    <div>
+      {sections.map((section, i) => (
+        <DashboardSection key={i} section={section} />
+      ))}
+    </div>
+  );
+}
+```
+
+`switch (section.tag)`による分岐はTypeScriptのControl Flow Analysisが標準でサポートするnarrowingパターンであり、`tag`のリテラル値から各ケースの型が一意に決定されます。Type Predicateとは異なり、コンパイラ自身が型の絞り込みを検証するため、Escape Hatchに一切頼る必要がありません。
+
+一方で、このパターンにはトレードオフがあります。
+
+- APIレスポンスをタグ付きユニオンに変換する**中間層**（`toDashboardSections`）が必要になる
+- 元のレスポンス型を変更するか、変換関数を挟む設計判断が求められる
+- 表示パターンが少ない場合は過剰な抽象化になりうる
+
+「Escape Hatchを一切使わない」ことを重視する場合にはもっとも堅牢な選択肢ですが、既存コードへの導入コストはEarly Returnよりも大きくなります。
+
 ### 比較表
 
-| パターン               | 型安全 | ルール準拠 | コンポーネント変更 | 備考                                 |
-| ---------------------- | ------ | ---------- | ------------------ | ------------------------------------ |
-| インラインチェック     | ◯      | ✕          | 不要               |                                      |
-| Type Predicate         | ◯      | ◯          | 不要               | 実装の正しさはコンパイラが保証しない |
-| Early Return           | ◯      | ◯          | 必要               | コンパイラがnarrowingを自動検証      |
-| Non-null Assertion (!) | ✕      | ◯          | 不要               |                                      |
-| 三項演算子             | ◯      | ✕          | 不要               |                                      |
+| パターン               | 型安全 | ルール準拠 | コンポーネント変更 | Escape Hatch不要 | 備考                                 |
+| ---------------------- | ------ | ---------- | ------------------ | ---------------- | ------------------------------------ |
+| インラインチェック     | ◯      | ✕          | 不要               | ◯                |                                      |
+| Type Predicate         | ◯      | ◯          | 不要               | ✕                | 実装の正しさはコンパイラが保証しない |
+| Early Return           | ◯      | ◯          | 必要               | ◯                | コンパイラがnarrowingを自動検証      |
+| Non-null Assertion (!) | ✕      | ◯          | 不要               | ✕                |                                      |
+| 三項演算子             | ◯      | ✕          | 不要               | ◯                |                                      |
+| Discriminated Union    | ◯      | ◯          | 必要               | ◯                | 中間変換層が必要                     |
 
-**型安全性とルール準拠を両立できるのは、Type PredicateとEarly Returnの2つ**です。
+**型安全性とルール準拠を両立できるのは、Type Predicate・Early Return・Discriminated Unionの3つ**です。さらにEscape Hatchに頼らないのはEarly ReturnとDiscriminated Unionの2つですが、導入コストとのバランスで選択することになります。
 
 ## Type Predicateのパフォーマンスへの影響
 
@@ -561,6 +646,26 @@ function UserSection({
 }
 ```
 
+### Discriminated Unionが向いているケース
+
+- Escape Hatchを一切使わず、コンパイラの自動検証だけで型安全性を確保したい場合
+- APIレスポンスの構造を設計段階からコントロールできる場合
+- 表示パターンが多く、状態ごとの分岐を明確にしたい場合
+
+```tsx
+// タグで状態を区別し、switchでハンドリング
+function DashboardSection({ section }: { section: DashboardSection }) {
+  switch (section.tag) {
+    case "users":
+      return <UserTable users={section.users} />;
+    case "orders":
+      return <OrderTable orders={section.orders} />;
+    case "empty":
+      return <p>{section.reason}</p>;
+  }
+}
+```
+
 ### 避けるべきパターン
 
 - **Non-null Assertion（!）**: 型チェックを無効化するため、コーディングルールを守る意味がなくなる
@@ -570,6 +675,6 @@ function UserSection({
 
 「ロジックをJSX外に出す」というコーディングルールは可読性の観点で正しいですが、boolean変数への代入によってTypeScriptの型narrowingが消えるという副作用があります。
 
-この問題に対して5つのパターンを検証した結果、**Type Predicate**と**Early Return**が型安全性とルール準拠を両立できる現実的な選択肢でした。特にType Predicateは、パフォーマンス計測の結果からも型チェック速度への影響は無視できるレベルであり、安心して採用できます。
+この問題に対して6つのパターンを検証した結果、**Type Predicate**・**Early Return**・**Discriminated Union**が型安全性とルール準拠を両立できる選択肢でした。特にType Predicateは、パフォーマンス計測の結果からも型チェック速度への影響は無視できるレベルであり、安心して採用できます。一方、Type Predicateは実装の正しさをコンパイラが保証しないEscape Hatchである点に注意が必要です。Escape Hatchを排除したい場合は、Early ReturnまたはDiscriminated Unionが適しています。
 
 コーディングルールを導入する際は、TypeScriptの型システムとの相互作用を考慮し、ルールの例外や推奨パターンをあわせて明記しておくと、チーム全体の開発体験が向上するのではないでしょうか。
