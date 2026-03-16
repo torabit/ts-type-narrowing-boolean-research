@@ -4,6 +4,7 @@ import { Pattern2_TypePredicate } from "./patterns/3-type-predicate";
 import { Pattern3_EarlyReturn } from "./patterns/4-early-return";
 import { Pattern4_NonNullAssertion } from "./patterns/5-non-null-assertion";
 import { Pattern5_Ternary } from "./patterns/6-ternary";
+import { Pattern6_DiscriminatedUnion } from "./patterns/7-discriminated-union";
 import { sampleResponse } from "./types";
 
 export function App() {
@@ -28,6 +29,9 @@ export function App() {
 
       <h2>Pattern 5: ternary</h2>
       <Pattern5_Ternary response={sampleResponse} />
+
+      <h2>Pattern 6: discriminated union (判別可能ユニオン)</h2>
+      <Pattern6_DiscriminatedUnion response={sampleResponse} />
     </div>
   );
 }
