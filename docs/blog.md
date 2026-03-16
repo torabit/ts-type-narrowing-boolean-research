@@ -144,7 +144,18 @@ if (hasOrders) {
 }
 ```
 
-これはTypeScriptの仕様上の制約です。変数への代入を挟むと、コンパイラは「この`boolean`が`true`のとき、元のどの値がどの型に絞り込まれるか」という情報を保持しません。なぜ保持しないのか、TypeScriptのコンパイラ設計上の理由を掘り下げてみます。
+なお、TypeScript 4.4で「[Control Flow Analysis of Aliased Conditions and Discriminants](https://github.com/microsoft/TypeScript/pull/44730)」（Anders Hejlsberg, PR #44730）が導入され、`const`宣言されたエイリアス条件経由でもnarrowingが効くケースが追加されました。たとえば`typeof`によるプリミティブ型のチェックは、エイリアス経由でも正しくnarrowingされます。
+
+```ts
+function example(x: string | number) {
+  const isString = typeof x === "string";
+  if (isString) {
+    x; // string にnarrowingされる（TypeScript 4.4以降）
+  }
+}
+```
+
+しかし今回の問題はこれとは異なります。`response.users != null`のようなオブジェクトプロパティのチェックでは、プロパティがミュータブルであるため、4.4以降でもエイリアス経由のnarrowingは効きません。以降では、なぜこのケースではnarrowingが効かないのか、コンパイラ設計上の理由を掘り下げます。
 
 #### エイリアス条件と可変性の問題
 
