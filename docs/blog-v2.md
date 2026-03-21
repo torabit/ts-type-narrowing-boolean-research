@@ -151,13 +151,16 @@ const hasUsers = response.users != null;
 
 `hasUsers` は `const` なので条件 1 は満たしています。しかし、`response.users` はオブジェクトの**プロパティ**です。
 
-JavaScript のオブジェクトは mutable です。`response` は関数の引数として外部から渡されたオブジェクトであり、コンパイラの視点からは、`hasUsers` の評価後に `response.users` が別の値に変更される可能性を排除できません。
+JavaScript のオブジェクトは mutable です。`response` は関数の引数として外部から渡されたオブジェクトであり、呼び出し元と同じオブジェクトへの参照を共有しています。このように**同じオブジェクトを複数の参照が指している状態**を、一般に **Object Aliasing** と呼びます。
+
+Object Aliasing が存在する場合、コンパイラの視点からは、`hasUsers` の評価後に別の参照を通じて `response.users` が書き換えられる可能性を排除できません。
 
 ```ts
 const hasUsers = response.users != null; // (1) true が入る
 
-// コンパイラはこの間に response.users が変わる可能性を考慮する
-trackDashboardView(response); // (2) 内部で response.users が書き換えられるかもしれない
+// response は外部と参照を共有している（Object Aliasing）
+// この関数の内部で response.users が書き換えられるかもしれない
+trackDashboardView(response); // (2)
 
 if (hasUsers) {
   // (3) hasUsers は true だが、response.users は undefined かもしれない
