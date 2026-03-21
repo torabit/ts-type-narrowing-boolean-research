@@ -39,7 +39,11 @@ function PaymentList({ payments }: { payments: Payment[] }) {
   );
 }
 
-export function Pattern5_Ternary({ response }: { response: DashboardResponse }) {
+export function Pattern5_Ternary({
+  response,
+}: {
+  response: DashboardResponse;
+}) {
   return (
     <div>
       <p>三項演算子で直接条件チェック</p>

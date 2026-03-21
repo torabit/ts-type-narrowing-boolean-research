@@ -1,0 +1,41 @@
+query GetDashboardSections {
+  dashboardSections {
+    ... on UserSection {
+      __typename
+      users {
+        id
+        name
+        email
+      }
+      permissions {
+        canViewUsers
+      }
+    }
+    ... on OrderSection {
+      __typename
+      orders {
+        id
+        product
+        amount
+      }
+      permissions {
+        canViewOrders
+      }
+    }
+    ... on PaymentSection {
+      __typename
+      payments {
+        id
+        method
+        status
+      }
+      permissions {
+        canViewPayments
+      }
+    }
+    ... on EmptySection {
+      __typename
+      reason
+    }
+  }
+}

@@ -1,7 +1,13 @@
 // Pattern 3: early return
 // コンポーネントを分割して early return で narrowing
 
-import type { User, Order, Payment, Permissions, DashboardResponse } from "../types";
+import type {
+  User,
+  Order,
+  Payment,
+  Permissions,
+  DashboardResponse,
+} from "../types";
 
 function UserList({ users }: { users: User[] }) {
   return (
@@ -39,7 +45,13 @@ function PaymentList({ payments }: { payments: Payment[] }) {
   );
 }
 
-function UserSection({ users, permissions }: { users: User[] | undefined; permissions: Permissions | undefined }) {
+function UserSection({
+  users,
+  permissions,
+}: {
+  users: User[] | undefined;
+  permissions: Permissions | undefined;
+}) {
   if (permissions == null || !permissions.canViewUsers) {
     return null;
   }
@@ -50,7 +62,13 @@ function UserSection({ users, permissions }: { users: User[] | undefined; permis
   return <UserList users={users} />;
 }
 
-function OrderSection({ orders, permissions }: { orders: Order[] | undefined; permissions: Permissions | undefined }) {
+function OrderSection({
+  orders,
+  permissions,
+}: {
+  orders: Order[] | undefined;
+  permissions: Permissions | undefined;
+}) {
   if (permissions == null || !permissions.canViewOrders) {
     return null;
   }
@@ -60,7 +78,13 @@ function OrderSection({ orders, permissions }: { orders: Order[] | undefined; pe
   return <OrderList orders={orders} />;
 }
 
-function PaymentSection({ payments, permissions }: { payments: Payment[] | undefined; permissions: Permissions | undefined }) {
+function PaymentSection({
+  payments,
+  permissions,
+}: {
+  payments: Payment[] | undefined;
+  permissions: Permissions | undefined;
+}) {
   if (permissions == null || !permissions.canViewPayments) {
     return null;
   }
@@ -70,13 +94,23 @@ function PaymentSection({ payments, permissions }: { payments: Payment[] | undef
   return <PaymentList payments={payments} />;
 }
 
-export function Pattern3_EarlyReturn({ response }: { response: DashboardResponse }) {
+export function Pattern3_EarlyReturn({
+  response,
+}: {
+  response: DashboardResponse;
+}) {
   return (
     <div>
       <p>子コンポーネントで early return</p>
       <UserSection users={response.users} permissions={response.permissions} />
-      <OrderSection orders={response.orders} permissions={response.permissions} />
-      <PaymentSection payments={response.payments} permissions={response.permissions} />
+      <OrderSection
+        orders={response.orders}
+        permissions={response.permissions}
+      />
+      <PaymentSection
+        payments={response.payments}
+        permissions={response.permissions}
+      />
     </div>
   );
 }

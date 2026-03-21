@@ -5,6 +5,7 @@ import { Pattern3_EarlyReturn } from "./patterns/4-early-return";
 import { Pattern4_NonNullAssertion } from "./patterns/5-non-null-assertion";
 import { Pattern5_Ternary } from "./patterns/6-ternary";
 import { Pattern6_DiscriminatedUnion } from "./patterns/7-discriminated-union";
+import { Pattern7_ConstAliasedConditions } from "./patterns/8-const-aliased-conditions";
 import { sampleResponse } from "./types";
 
 export function App() {
@@ -32,6 +33,9 @@ export function App() {
 
       <h2>Pattern 6: discriminated union (判別可能ユニオン)</h2>
       <Pattern6_DiscriminatedUnion response={sampleResponse} />
+
+      <h2>Pattern 7: const aliased conditions (TS 4.4+)</h2>
+      <Pattern7_ConstAliasedConditions response={sampleResponse} />
     </div>
   );
 }

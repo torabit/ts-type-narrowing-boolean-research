@@ -1,0 +1,63 @@
+type User {
+  id: Int!
+  name: String!
+  email: String!
+}
+
+type Order {
+  id: Int!
+  product: String!
+  amount: Int!
+}
+
+type Payment {
+  id: Int!
+  method: String!
+  status: PaymentStatus!
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+type Permissions {
+  canViewUsers: Boolean!
+  canViewOrders: Boolean!
+  canViewPayments: Boolean!
+}
+
+type DashboardResponse {
+  users: [User!]
+  orders: [Order!]
+  payments: [Payment!]
+  permissions: Permissions
+}
+
+# Discriminated Union を試みる
+type UserSection {
+  users: [User!]!
+  permissions: Permissions!
+}
+
+type OrderSection {
+  orders: [Order!]!
+  permissions: Permissions!
+}
+
+type PaymentSection {
+  payments: [Payment!]!
+  permissions: Permissions!
+}
+
+type EmptySection {
+  reason: String!
+}
+
+union DashboardSection = UserSection | OrderSection | PaymentSection | EmptySection
+
+type Query {
+  dashboard: DashboardResponse!
+  dashboardSections: [DashboardSection!]!
+}
