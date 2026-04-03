@@ -1,6 +1,7 @@
 // 問題の再現:
 // 複雑な条件（permissions + null チェック + length チェック）を boolean に代入すると narrowing が消える
 
+import { ReactElement } from "react";
 import type { User, Order, Payment, DashboardResponse } from "../types";
 
 function UserList({ users }: { users: User[] }) {
@@ -39,7 +40,11 @@ function PaymentList({ payments }: { payments: Payment[] }) {
   );
 }
 
-export function Problem({ response }: { response: DashboardResponse }) {
+export function Problem({
+  response,
+}: {
+  response: DashboardResponse;
+}): ReactElement {
   // boolean に代入した時点で narrowing が消える
   const canShowUsers =
     response.permissions != null &&
@@ -59,7 +64,10 @@ export function Problem({ response }: { response: DashboardResponse }) {
 
   return (
     <div>
-      <p>canShowUsers / canShowOrders / canShowPayments の型: boolean (narrowing 効かない)</p>
+      <p>
+        canShowUsers / canShowOrders / canShowPayments の型: boolean (narrowing
+        効かない)
+      </p>
       {/* response.users は User[] | undefined のまま */}
       {canShowUsers && <UserList users={response.users} />}
       {canShowOrders && <OrderList orders={response.orders} />}
